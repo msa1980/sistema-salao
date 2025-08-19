@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "Sistema Salão",
+    "slug": "sistema-salao",
+    "version": "1.0.0",
+    "platforms": ["ios", "android", "web"]
+  }
+}
