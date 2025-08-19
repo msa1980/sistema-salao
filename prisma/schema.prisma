@@ -1,0 +1,226 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Modelo de Cliente
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?  @unique
+  address   String?
+  birthDate DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  appointments Appointment[]
+  loyaltyCustomer LoyaltyCustomer?
+  
+  @@map("customers")
+}
+
+// Modelo de Funcionário
+model Employee {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String   @unique
+  email        String?  @unique
+  position     String
+  salary       Float
+  commission   Float    @default(0)
+  specialties  String[] // Array de especialidades
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relacionamentos
+  appointments Appointment[]
+  
+  @@map("employees")
+}
+
+// Modelo de Serviço
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  duration    Int      // duração em minutos
+  category    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  appointments Appointment[]
+  
+  @@map("services")
+}
+
+// Modelo de Agendamento
+model Appointment {
+  id         String            @id @default(cuid())
+  date       DateTime
+  startTime  String
+  endTime    String
+  status     AppointmentStatus @default(SCHEDULED)
+  notes      String?
+  totalPrice Float
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  
+  // Relacionamentos
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+  
+  payments Payment[]
+  
+  @@map("appointments")
+}
+
+// Enum para status do agendamento
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// Modelo de Pagamento
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Float
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  description   String?
+  transactionId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relacionamentos
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  
+  @@map("payments")
+}
+
+// Enums para pagamento
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+// Modelo de Produto
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  minStock    Int      @default(5)
+  category    String
+  brand       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("products")
+}
+
+// Modelo de Cliente Fidelidade
+model LoyaltyCustomer {
+  id         String   @id @default(cuid())
+  points     Int      @default(0)
+  level      String   @default("Bronze")
+  totalSpent Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relacionamentos
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  pointsHistory PointsHistory[]
+  rewardRedemptions RewardRedemption[]
+  
+  @@map("loyalty_customers")
+}
+
+// Modelo de Recompensa
+model Reward {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  pointsCost  Int
+  value       Float
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  redemptions RewardRedemption[]
+  
+  @@map("rewards")
+}
+
+// Modelo de Histórico de Pontos
+model PointsHistory {
+  id          String   @id @default(cuid())
+  points      Int
+  type        String   // "earned" ou "spent"
+  description String
+  createdAt   DateTime @default(now())
+  
+  // Relacionamentos
+  loyaltyCustomerId String
+  loyaltyCustomer   LoyaltyCustomer @relation(fields: [loyaltyCustomerId], references: [id], onDelete: Cascade)
+  
+  @@map("points_history")
+}
+
+// Modelo de Resgate de Recompensa
+model RewardRedemption {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  
+  // Relacionamentos
+  loyaltyCustomerId String
+  loyaltyCustomer   LoyaltyCustomer @relation(fields: [loyaltyCustomerId], references: [id], onDelete: Cascade)
+  
+  rewardId String
+  reward   Reward @relation(fields: [rewardId], references: [id])
+  
+  @@map("reward_redemptions")
+}

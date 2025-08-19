@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Employee {
   id: string;
@@ -15,10 +20,12 @@ interface Employee {
 
 interface EmployeeContextType {
   employees: Employee[];
-  updateEmployee: (id: string, updatedEmployee: Employee) => void;
-  addEmployee: (employee: Employee) => void;
-  deleteEmployee: (id: string) => void;
+  loading: boolean;
+  updateEmployee: (id: string, updatedEmployee: Partial<Employee>) => Promise<void>;
+  addEmployee: (employee: Omit<Employee, 'id'>) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
   getActiveEmployees: () => Employee[];
+  refreshEmployees: () => Promise<void>;
 }
 
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
@@ -32,80 +39,129 @@ export const useEmployees = () => {
 };
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [employees, setEmployees] = useState<Employee[]>([
-    { 
-      id: '1', 
-      name: 'João Silva', 
-      role: 'Cabeleireiro', 
-      email: 'joao@salao.com',
-      phone: '(11) 98765-4321',
-      photo: '',
-      specialties: ['Corte Feminino', 'Escova', 'Coloração'], 
-      isActive: true,
-      hireDate: '2021-01-15',
-      workingHours: { start: '08:00', end: '18:00' }
-    },
-    { 
-      id: '2', 
-      name: 'Carla Oliveira', 
-      role: 'Colorista', 
-      email: 'carla@salao.com',
-      phone: '(11) 91234-5678',
-      photo: '',
-      specialties: ['Coloração', 'Hidratação'], 
-      isActive: true,
-      hireDate: '2021-03-10',
-      workingHours: { start: '09:00', end: '17:00' }
-    },
-    { 
-      id: '3', 
-      name: 'Ana Paula', 
-      role: 'Manicure', 
-      email: 'ana@salao.com',
-      phone: '(11) 99876-5432',
-      photo: '',
-      specialties: ['Manicure', 'Pedicure'], 
-      isActive: true,
-      hireDate: '2022-05-20',
-      workingHours: { start: '08:30', end: '17:30' }
-    },
-    { 
-      id: '4', 
-      name: 'Roberto Santos', 
-      role: 'Cabeleireiro', 
-      email: 'roberto@salao.com',
-      phone: '(11) 95555-9999',
-      photo: '',
-      specialties: ['Corte Feminino', 'Corte Masculino'], 
-      isActive: true,
-      hireDate: '2020-11-05',
-      workingHours: { start: '08:00', end: '18:00' }
-    },
-  ]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const updateEmployee = (id: string, updatedEmployee: Employee) => {
-    setEmployees(prev => prev.map(emp => emp.id === id ? updatedEmployee : emp));
+  // Carregar funcionários do Supabase
+  const loadEmployees = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao carregar funcionários:', error);
+        return;
+      }
+      
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Erro inesperado ao carregar funcionários:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addEmployee = (employee: Employee) => {
-    setEmployees(prev => [...prev, employee]);
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  const updateEmployee = async (id: string, updatedEmployee: Partial<Employee>) => {
+    try {
+      const updateData = {
+        ...updatedEmployee,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao atualizar funcionário:', error);
+        throw error;
+      }
+      
+      setEmployees(prev => 
+        prev.map(emp => 
+          emp.id === id ? data : emp
+        )
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar funcionário:', error);
+      throw error;
+    }
   };
 
-  const deleteEmployee = (id: string) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== id));
+  const addEmployee = async (employeeData: Omit<Employee, 'id'>) => {
+    try {
+      const newEmployee = {
+        ...employeeData,
+        id: `emp_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .insert([newEmployee])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao adicionar funcionário:', error);
+        throw error;
+      }
+      
+      setEmployees(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Erro ao adicionar funcionário:', error);
+      throw error;
+    }
+  };
+
+  const deleteEmployee = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Erro ao deletar funcionário:', error);
+        throw error;
+      }
+      
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+    } catch (error) {
+      console.error('Erro ao deletar funcionário:', error);
+      throw error;
+    }
   };
 
   const getActiveEmployees = () => {
     return employees.filter(emp => emp.isActive);
   };
 
+  const refreshEmployees = async () => {
+    await loadEmployees();
+  };
+
   return (
     <EmployeeContext.Provider value={{
       employees,
+      loading,
       updateEmployee,
       addEmployee,
       deleteEmployee,
-      getActiveEmployees
+      getActiveEmployees,
+      refreshEmployees
     }}>
       {children}
     </EmployeeContext.Provider>

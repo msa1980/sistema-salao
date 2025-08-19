@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface Service {
   id: string;
@@ -12,48 +17,125 @@ export interface Service {
 
 interface ServiceContextType {
   services: Service[];
-  addService: (service: Omit<Service, 'id'>) => void;
-  updateService: (id: string, service: Partial<Service>) => void;
-  deleteService: (id: string) => void;
+  loading: boolean;
+  addService: (service: Omit<Service, 'id'>) => Promise<void>;
+  updateService: (id: string, service: Partial<Service>) => Promise<void>;
+  deleteService: (id: string) => Promise<void>;
   getServiceById: (id: string) => Service | undefined;
   getActiveServices: () => Service[];
   getServicesByCategory: (category: string) => Service[];
+  refreshServices: () => Promise<void>;
 }
 
 const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
 
-const initialServices: Service[] = [
-  { id: '1', name: 'Corte Feminino', category: 'Cabelo', price: 45, duration: 60, description: 'Corte moderno com acabamento profissional', isActive: true },
-  { id: '2', name: 'Coloração', category: 'Cabelo', price: 120, duration: 120, description: 'Coloração completa com produtos premium', isActive: true },
-  { id: '3', name: 'Escova', category: 'Cabelo', price: 30, duration: 45, description: 'Escova modeladora com finalização', isActive: true },
-  { id: '4', name: 'Hidratação', category: 'Cabelo', price: 60, duration: 90, description: 'Tratamento hidratante intensivo', isActive: true },
-  { id: '5', name: 'Manicure', category: 'Unhas', price: 25, duration: 45, description: 'Cuidado completo das unhas das mãos', isActive: true },
-  { id: '6', name: 'Pedicure', category: 'Unhas', price: 30, duration: 60, description: 'Cuidado completo das unhas dos pés', isActive: true },
-  { id: '7', name: 'Depilação Perna', category: 'Depilação', price: 40, duration: 45, description: 'Depilação completa das pernas', isActive: true },
-  { id: '8', name: 'Sobrancelha', category: 'Design', price: 20, duration: 30, description: 'Design e modelagem de sobrancelhas', isActive: true },
-];
+// Os dados iniciais agora vêm do Supabase
 
 export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const addService = (serviceData: Omit<Service, 'id'>) => {
-    const newService: Service = {
-      ...serviceData,
-      id: Date.now().toString()
-    };
-    setServices(prev => [...prev, newService]);
+  // Carregar serviços do Supabase
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao carregar serviços:', error);
+        return;
+      }
+      
+      setServices(data || []);
+    } catch (error) {
+      console.error('Erro inesperado ao carregar serviços:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateService = (id: string, serviceData: Partial<Service>) => {
-    setServices(prev => 
-      prev.map(service => 
-        service.id === id ? { ...service, ...serviceData } : service
-      )
-    );
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const addService = async (serviceData: Omit<Service, 'id'>) => {
+    try {
+      const newService = {
+        ...serviceData,
+        id: `serv_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { data, error } = await supabase
+        .from('services')
+        .insert([newService])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao adicionar serviço:', error);
+        throw error;
+      }
+      
+      setServices(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Erro ao adicionar serviço:', error);
+      throw error;
+    }
   };
 
-  const deleteService = (id: string) => {
-    setServices(prev => prev.filter(service => service.id !== id));
+  const updateService = async (id: string, serviceData: Partial<Service>) => {
+    try {
+      const updateData = {
+        ...serviceData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { data, error } = await supabase
+        .from('services')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao atualizar serviço:', error);
+        throw error;
+      }
+      
+      setServices(prev => 
+        prev.map(service => 
+          service.id === id ? data : service
+        )
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar serviço:', error);
+      throw error;
+    }
+  };
+
+  const deleteService = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Erro ao deletar serviço:', error);
+        throw error;
+      }
+      
+      setServices(prev => prev.filter(service => service.id !== id));
+    } catch (error) {
+      console.error('Erro ao deletar serviço:', error);
+      throw error;
+    }
   };
 
   const getServiceById = (id: string) => {
@@ -68,15 +150,21 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return services.filter(service => service.category === category && service.isActive);
   };
 
+  const refreshServices = async () => {
+    await loadServices();
+  };
+
   return (
     <ServiceContext.Provider value={{
       services,
+      loading,
       addService,
       updateService,
       deleteService,
       getServiceById,
       getActiveServices,
-      getServicesByCategory
+      getServicesByCategory,
+      refreshServices
     }}>
       {children}
     </ServiceContext.Provider>
