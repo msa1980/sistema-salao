@@ -190,14 +190,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Hash da senha
       const hashedPassword = await bcrypt.hash(data.password, 10);
 
+      // Gerar ID único para o usuário
+      const userId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
       // Criar usuário
       const { data: newUser, error } = await supabase
         .from('users')
         .insert({
+          id: userId,
           email: data.email,
           password: hashedPassword,
           name: data.name,
-          role: 'USER'
+          role: 'USER',
+          createdAt: now,
+          updatedAt: now
         })
         .select()
         .single();
