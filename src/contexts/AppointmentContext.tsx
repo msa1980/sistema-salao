@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useEmployees } from './EmployeeContext';
 import { useCustomers } from './CustomerContext';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Appointment {
   id: string;
@@ -19,9 +24,9 @@ interface Appointment {
 
 interface AppointmentContextType {
   appointments: Appointment[];
-  addAppointment: (appointment: Appointment) => void;
-  updateAppointment: (id: string, updatedAppointment: Appointment) => void;
-  deleteAppointment: (id: string) => void;
+  addAppointment: (appointment: Appointment) => Promise<void>;
+  updateAppointment: (id: string, updatedAppointment: Appointment) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
   getAppointmentsByDate: (date: string) => Appointment[];
   getAppointmentsByEmployee: (employeeId: string) => Appointment[];
 }
@@ -39,12 +44,57 @@ export const useAppointments = () => {
 export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { employees } = useEmployees();
   const { updateCustomer, getCustomerById, customers } = useCustomers();
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    { id: '1', customer: 'Maria Silva', service: 'Corte + Escova', time: '09:00', duration: 60, status: 'confirmed', phone: '(11) 99999-9999', date: new Date().toISOString().split('T')[0], price: 75, services: ['1', '3'], employeeId: '1' },
-    { id: '2', customer: 'Ana Costa', service: 'Coloração', time: '10:30', duration: 120, status: 'scheduled', phone: '(11) 88888-8888', date: new Date().toISOString().split('T')[0], price: 120, services: ['2'], employeeId: '2' },
-    { id: '3', customer: 'Julia Santos', service: 'Manicure', time: '14:00', duration: 45, status: 'confirmed', phone: '(11) 77777-7777', date: new Date().toISOString().split('T')[0], price: 25, services: ['5'], employeeId: '3' },
-    { id: '4', customer: 'Carla Lima', service: 'Hidratação', time: '15:30', duration: 90, status: 'completed', phone: '(11) 66666-6666', date: new Date().toISOString().split('T')[0], price: 60, services: ['4'], employeeId: '1' },
-  ]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Função para carregar agendamentos do Supabase
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:customers(*),
+          employee:employees(*),
+          service:services(*)
+        `)
+        .order('date', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao carregar agendamentos:', error);
+        return;
+      }
+      
+      // Transformar dados do Supabase para o formato esperado
+      const transformedAppointments: Appointment[] = data.map(appointment => ({
+        id: appointment.id,
+        customer: appointment.customer?.name || 'Cliente não encontrado',
+        phone: appointment.customer?.phone || '',
+        customerId: appointment.customerId,
+        employeeId: appointment.employeeId,
+        service: appointment.service?.name || 'Serviço não encontrado',
+        services: [appointment.serviceId], // Usando serviceId como array para compatibilidade
+        date: new Date(appointment.date).toISOString().split('T')[0],
+        time: appointment.startTime,
+        duration: appointment.service?.duration || 60,
+        price: appointment.totalPrice,
+        status: appointment.status.toLowerCase(),
+        observations: appointment.notes
+      }));
+      
+      setAppointments(transformedAppointments);
+    } catch (error) {
+      console.error('Erro ao carregar agendamentos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadAppointments();
+  }, []);
 
   // Função para atualizar dados do cliente baseado no agendamento
   const updateCustomerFromAppointment = (appointment: Appointment, isCompleted: boolean = false) => {
@@ -78,32 +128,149 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     );
   }, [employees]);
 
-  const addAppointment = (appointment: Appointment) => {
-    setAppointments(prev => [...prev, appointment]);
-    
-    // Atualizar dados do cliente se o agendamento for completado
-    if (appointment.status === 'completed') {
-      updateCustomerFromAppointment(appointment, true);
-    } else {
-      updateCustomerFromAppointment(appointment, false);
+  const addAppointment = async (appointment: Appointment) => {
+    try {
+      // Primeiro, verificar se o cliente existe ou criar um novo
+      let customerId = appointment.customerId;
+      
+      if (!customerId) {
+        // Buscar cliente existente pelo telefone
+        const { data: existingCustomer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('phone', appointment.phone)
+          .single();
+        
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          // Criar novo cliente
+          const { data: newCustomer, error: customerError } = await supabase
+            .from('customers')
+            .insert([{
+              name: appointment.customer,
+              phone: appointment.phone
+            }])
+            .select('id')
+            .single();
+          
+          if (customerError) {
+            console.error('Erro ao criar cliente:', customerError);
+            throw customerError;
+          }
+          
+          customerId = newCustomer.id;
+        }
+      }
+      
+      // Buscar o primeiro serviço para usar como serviceId (compatibilidade com schema)
+      const firstServiceId = appointment.services[0] || 'default-service-id';
+      
+      // Preparar dados para o Supabase conforme o schema
+      const appointmentData = {
+        id: appointment.id,
+        date: new Date(appointment.date + 'T' + appointment.time).toISOString(),
+        startTime: appointment.time,
+        endTime: appointment.time, // Pode ser calculado baseado na duração
+        status: appointment.status.toUpperCase(),
+        notes: appointment.observations || null,
+        totalPrice: appointment.price,
+        customerId: customerId,
+        employeeId: appointment.employeeId,
+        serviceId: firstServiceId
+      };
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([appointmentData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao adicionar agendamento:', error);
+        throw error;
+      }
+      
+      // Atualizar estado local
+      setAppointments(prev => [...prev, appointment]);
+      
+      // Atualizar dados do cliente se o agendamento for completado
+      if (appointment.status === 'completed') {
+        updateCustomerFromAppointment(appointment, true);
+      } else {
+        updateCustomerFromAppointment(appointment, false);
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar agendamento:', error);
+      throw error;
     }
   };
 
-  const updateAppointment = (id: string, updatedAppointment: Appointment) => {
-    const previousAppointment = appointments.find(app => app.id === id);
-    
-    setAppointments(prev => prev.map(app => app.id === id ? updatedAppointment : app));
-    
-    // Se o status mudou para 'completed', atualizar dados do cliente
-    if (previousAppointment && 
-        previousAppointment.status !== 'completed' && 
-        updatedAppointment.status === 'completed') {
-      updateCustomerFromAppointment(updatedAppointment, true);
+  const updateAppointment = async (id: string, updatedAppointment: Appointment) => {
+    try {
+      const previousAppointment = appointments.find(app => app.id === id);
+      
+      // Buscar o primeiro serviço para usar como serviceId (compatibilidade com schema)
+      const firstServiceId = updatedAppointment.services[0] || 'default-service-id';
+      
+      // Preparar dados para o Supabase conforme o schema
+      const updateData = {
+        date: new Date(updatedAppointment.date + 'T' + updatedAppointment.time).toISOString(),
+        startTime: updatedAppointment.time,
+        endTime: updatedAppointment.time,
+        status: updatedAppointment.status.toUpperCase(),
+        notes: updatedAppointment.observations || null,
+        totalPrice: updatedAppointment.price,
+        employeeId: updatedAppointment.employeeId,
+        serviceId: firstServiceId,
+        updatedAt: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao atualizar agendamento:', error);
+        throw error;
+      }
+      
+      // Atualizar estado local
+      setAppointments(prev => prev.map(app => app.id === id ? updatedAppointment : app));
+      
+      // Se o status mudou para 'completed', atualizar dados do cliente
+      if (previousAppointment && 
+          previousAppointment.status !== 'completed' && 
+          updatedAppointment.status === 'completed') {
+        updateCustomerFromAppointment(updatedAppointment, true);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar agendamento:', error);
+      throw error;
     }
   };
 
-  const deleteAppointment = (id: string) => {
-    setAppointments(prev => prev.filter(app => app.id !== id));
+  const deleteAppointment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Erro ao deletar agendamento:', error);
+        throw error;
+      }
+      
+      // Atualizar estado local
+      setAppointments(prev => prev.filter(app => app.id !== id));
+    } catch (error) {
+      console.error('Erro ao deletar agendamento:', error);
+      throw error;
+    }
   };
 
   const getAppointmentsByDate = (date: string) => {

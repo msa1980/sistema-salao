@@ -123,46 +123,56 @@ const Appointments: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDeleteAppointment = (appointmentId: string) => {
+  const handleDeleteAppointment = async (appointmentId: string) => {
     if (confirm('Tem certeza que deseja cancelar este agendamento?')) {
-      deleteAppointment(appointmentId);
+      try {
+        await deleteAppointment(appointmentId);
+      } catch (error) {
+        console.error('Erro ao deletar agendamento:', error);
+        alert('Erro ao deletar agendamento. Tente novamente.');
+      }
     }
   };
 
-  const handleSaveAppointment = (formData: any) => {
-    // Calcular duração total e preço total com base nos serviços selecionados
-    const selectedServicesData = formData.selectedServices.map((serviceId: string) => 
-      services.find(s => s.id === serviceId)
-    ).filter(Boolean);
-    
-    const totalDuration = selectedServicesData.reduce((sum, service) => sum + (service?.duration || 0), 0);
-    const totalPrice = selectedServicesData.reduce((sum, service) => sum + (service?.price || 0), 0);
-    
-    // Criar string com nomes dos serviços
-    const serviceNames = selectedServicesData.map(service => service?.name).join(' + ');
-    
-    const appointmentData = {
-      id: editingAppointment?.id || Date.now().toString(),
-      customer: formData.customer,
-      phone: formData.phone,
-      service: serviceNames,
-      time: formData.time,
-      date: formData.date,
-      duration: totalDuration,
-      status: formData.status || 'scheduled',
-      price: totalPrice,
-      services: formData.selectedServices,
-      employeeId: formData.employeeId,
-    };
+  const handleSaveAppointment = async (formData: any) => {
+    try {
+      // Calcular duração total e preço total com base nos serviços selecionados
+      const selectedServicesData = formData.selectedServices.map((serviceId: string) => 
+        services.find(s => s.id === serviceId)
+      ).filter(Boolean);
+      
+      const totalDuration = selectedServicesData.reduce((sum, service) => sum + (service?.duration || 0), 0);
+      const totalPrice = selectedServicesData.reduce((sum, service) => sum + (service?.price || 0), 0);
+      
+      // Criar string com nomes dos serviços
+      const serviceNames = selectedServicesData.map(service => service?.name).join(' + ');
+      
+      const appointmentData = {
+        id: editingAppointment?.id || Date.now().toString(),
+        customer: formData.customer,
+        phone: formData.phone,
+        service: serviceNames,
+        time: formData.time,
+        date: formData.date,
+        duration: totalDuration,
+        status: formData.status || 'scheduled',
+        price: totalPrice,
+        services: formData.selectedServices,
+        employeeId: formData.employeeId,
+      };
 
-    if (editingAppointment && editingAppointment.id) {
-      updateAppointment(editingAppointment.id, appointmentData);
-    } else {
-      addAppointment(appointmentData);
+      if (editingAppointment && editingAppointment.id) {
+        await updateAppointment(editingAppointment.id, appointmentData);
+      } else {
+        await addAppointment(appointmentData);
+      }
+      
+      setShowModal(false);
+      setEditingAppointment(null);
+    } catch (error) {
+      console.error('Erro ao salvar agendamento:', error);
+      alert('Erro ao salvar agendamento. Tente novamente.');
     }
-    
-    setShowModal(false);
-    setEditingAppointment(null);
   };
 
   const AppointmentModal = () => {
