@@ -22,6 +22,23 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupType, setPopupType] = useState<'success' | 'error'>('success');
+
+  const showPopupMessage = (message: string, type: 'success' | 'error') => {
+    setPopupMessage(message);
+    setPopupType(type);
+    setShowPopup(true);
+    
+    // Auto-fechar o popup após 4 segundos
+    setTimeout(() => {
+      setShowPopup(false);
+      if (type === 'success') {
+        onSwitchToLogin();
+      }
+    }, 4000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,41 +47,41 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
 
     // Validações
     if (!formData.name || !formData.phone || !formData.address || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Por favor, preencha todos os campos');
+      showPopupMessage('Por favor, preencha todos os campos', 'error');
       return;
     }
 
     // Validar formato do telefone
     const phoneRegex = /^\(\d{2}\) \d{4}-\d{4}$/;
     if (!phoneRegex.test(formData.phone)) {
-      setError('Por favor, insira um telefone no formato (xx) xxxx-xxxx');
+      showPopupMessage('Por favor, insira um telefone no formato (xx) xxxx-xxxx', 'error');
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não coincidem');
+      showPopupMessage('As senhas não coincidem', 'error');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
+      showPopupMessage('A senha deve ter pelo menos 6 caracteres', 'error');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Por favor, insira um email válido');
+      showPopupMessage('Por favor, insira um email válido', 'error');
       return;
     }
 
     try {
-      const success = await register({
+      const result = await register({
         name: formData.name,
         email: formData.email,
         password: formData.password
       });
 
-      if (success) {
+      if (result.success) {
         // Adicionar cliente ao banco de dados
         try {
           await addCustomer({
@@ -72,27 +89,21 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
             phone: formData.phone,
             email: formData.email,
             address: formData.address,
-            totalSpent: 0,
-            totalVisits: 0,
-            status: 'active',
             notes: ''
           });
           
-          setSuccess('✅ Cadastro realizado com sucesso! Você pode fazer login agora.');
+          showPopupMessage(result.message + ' Você pode fazer login agora.', 'success');
           setFormData({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-          setTimeout(() => {
-            onSwitchToLogin();
-          }, 3000);
         } catch (customerError) {
           console.error('Erro ao adicionar cliente:', customerError);
-          setError('Usuário criado, mas houve erro ao salvar dados do cliente. Tente fazer login.');
+          showPopupMessage('Usuário criado, mas houve erro ao salvar dados do cliente. Tente fazer login.', 'error');
         }
       } else {
-        setError('Erro ao criar conta. Email pode já estar em uso.');
+        showPopupMessage(result.message, 'error');
       }
     } catch (error) {
       console.error('Erro no cadastro:', error);
-      setError('Erro inesperado ao criar conta. Tente novamente.');
+      showPopupMessage('Erro inesperado ao criar conta. Tente novamente.', 'error');
     }
   };
 
@@ -129,6 +140,50 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-400 flex items-center justify-center p-4">
+      {/* Popup Modal */}
+      {showPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-100">
+            <div className="text-center">
+              <div className={`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4 ${
+                popupType === 'success' ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                {popupType === 'success' ? (
+                  <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <h3 className={`text-lg font-semibold mb-2 ${
+                popupType === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {popupType === 'success' ? 'Sucesso!' : 'Erro!'}
+              </h3>
+              <p className="text-gray-600 mb-4">{popupMessage}</p>
+              <button
+                 onClick={() => {
+                   setShowPopup(false);
+                   if (popupType === 'success') {
+                     onSwitchToLogin();
+                   }
+                 }}
+                 className={`px-6 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                   popupType === 'success' 
+                     ? 'bg-green-600 hover:bg-green-700 text-white' 
+                     : 'bg-red-600 hover:bg-red-700 text-white'
+                 }`}
+               >
+                 {popupType === 'success' ? 'Ir para Login' : 'Tentar Novamente'}
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -298,19 +353,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
             </div>
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-600 text-sm">{error}</p>
-            </div>
-          )}
 
-          {/* Success Message */}
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-green-600 text-sm">{success}</p>
-            </div>
-          )}
 
           {/* Submit Button */}
           <button

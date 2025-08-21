@@ -7,7 +7,7 @@ const Customers: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
 
   // Filtrar clientes
   const filteredCustomers = customers.filter(customer => {
@@ -16,9 +16,7 @@ const Customers: React.FC = () => {
       customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.phone.includes(searchTerm);
     
-    const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const handleAddCustomer = () => {
@@ -48,17 +46,7 @@ const Customers: React.FC = () => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  const getStatusBadge = (status: string) => {
-    return status === 'active' ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        Ativo
-      </span>
-    ) : (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-        Inativo
-      </span>
-    );
-  };
+
 
   // Modal Component
   const CustomerModal = () => {
@@ -258,7 +246,7 @@ const Customers: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Clientes Ativos</p>
               <p className="text-2xl font-bold text-green-600">
-                {customers.filter(c => c.status === 'active').length}
+                {customers.length}
               </p>
             </div>
             <div className="bg-green-100 p-3 rounded-full">
@@ -310,38 +298,7 @@ const Customers: React.FC = () => {
             />
           </div>
           
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                statusFilter === 'all' 
-                  ? 'bg-purple-600 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setStatusFilter('active')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                statusFilter === 'active' 
-                  ? 'bg-green-600 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Ativos
-            </button>
-            <button
-              onClick={() => setStatusFilter('inactive')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                statusFilter === 'inactive' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Inativos
-            </button>
-          </div>
+
         </div>
       </div>
 
@@ -357,15 +314,8 @@ const Customers: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Contato
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Visitas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Gasto
-                </th>
+
+
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Última Visita
                 </th>
@@ -401,15 +351,8 @@ const Customers: React.FC = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(customer.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {customer.totalVisits}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                    {formatCurrency(customer.totalSpent)}
-                  </td>
+
+
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {customer.lastVisit ? formatDate(customer.lastVisit) : 'Nunca'}
                   </td>

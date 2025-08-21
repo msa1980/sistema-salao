@@ -29,11 +29,16 @@ export interface RegisterData {
   name: string;
 }
 
+export interface RegisterResult {
+  success: boolean;
+  message: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (credentials: LoginCredentials) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -171,7 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (data: RegisterData): Promise<boolean> => {
+  const register = async (data: RegisterData): Promise<RegisterResult> => {
     try {
       setLoading(true);
 
@@ -183,8 +188,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (existingUser) {
-        console.error('Email já cadastrado');
-        return false;
+        return {
+          success: false,
+          message: 'Este email já está cadastrado. Tente fazer login ou use outro email.'
+        };
       }
 
       // Hash da senha
@@ -211,13 +218,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error || !newUser) {
         console.error('Erro ao criar usuário:', error);
-        return false;
+        return {
+          success: false,
+          message: 'Erro ao criar usuário. Tente novamente mais tarde.'
+        };
       }
 
-      return true;
+      return {
+        success: true,
+        message: 'Usuário cadastrado com sucesso!'
+      };
     } catch (error) {
       console.error('Erro no registro:', error);
-      return false;
+      return {
+        success: false,
+        message: 'Erro inesperado ao criar conta. Tente novamente.'
+      };
     } finally {
       setLoading(false);
     }

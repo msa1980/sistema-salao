@@ -55,11 +55,6 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         lastVisit: appointment.date
       };
       
-      if (isCompleted) {
-        updates.totalVisits = customer.totalVisits + 1;
-        updates.totalSpent = customer.totalSpent + appointment.price;
-      }
-      
       updateCustomer(customer.id, updates);
     }
   };

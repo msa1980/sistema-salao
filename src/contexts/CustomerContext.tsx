@@ -15,16 +15,13 @@ export interface Customer {
   notes?: string;
   createdAt: string;
   lastVisit?: string;
-  totalVisits: number;
-  totalSpent: number;
-  status: 'active' | 'inactive';
   preferences?: string[];
 }
 
 interface CustomerContextType {
   customers: Customer[];
   loading: boolean;
-  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'totalVisits' | 'totalSpent'>) => Promise<void>;
+  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
   updateCustomer: (id: string, customer: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   getCustomerById: (id: string) => Customer | undefined;
@@ -79,7 +76,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const newCustomer = {
         ...customerData,
-        id: `cust_${Date.now()}`,
+        id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -156,7 +153,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getActiveCustomers = () => {
-    return customers.filter(customer => customer.status === 'active');
+    return customers;
   };
 
   const searchCustomers = (term: string) => {
