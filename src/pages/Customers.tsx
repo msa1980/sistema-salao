@@ -354,7 +354,7 @@ const Customers: React.FC = () => {
 
 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {customer.lastVisit ? formatDate(customer.lastVisit) : 'Nunca'}
+                    {customer.updatedAt ? formatDate(customer.updatedAt) : 'Nunca'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">

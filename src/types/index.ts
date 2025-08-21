@@ -29,7 +29,6 @@ export interface Customer {
   phone: string;
   loyaltyPoints: number;
   totalVisits: number;
-  lastVisit?: Date;
   preferences?: string;
 }
 

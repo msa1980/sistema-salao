@@ -14,7 +14,7 @@ export interface Customer {
   address?: string;
   notes?: string;
   createdAt: string;
-  lastVisit?: string;
+  updatedAt: string;
   preferences?: string[];
 }
 

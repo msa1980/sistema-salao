@@ -1,11 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
+import { debugAuth } from '../utils/debugAuth';
 
 // Configuração do Supabase
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Debug: Verificar configurações
+console.log('🔧 AuthContext - Configurações do Supabase:');
+console.log('URL:', supabaseUrl);
+console.log('Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : 'MISSING');
 
 // Tipos
 export interface User {
@@ -112,10 +118,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
+    console.log('🔐 Iniciando processo de login para:', credentials.email);
     try {
       setLoading(true);
 
       // Buscar usuário pelo email
+      console.log('🔍 Buscando usuário no banco de dados...');
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
@@ -123,18 +131,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('isActive', true)
         .single();
 
-      if (userError || !userData) {
+      if (userError) {
+        console.error('❌ Erro ao buscar usuário:', userError);
         return false;
       }
 
+      if (!userData) {
+        console.error('❌ Usuário não encontrado ou inativo');
+        return false;
+      }
+
+      console.log('✅ Usuário encontrado:', { id: userData.id, email: userData.email, role: userData.role });
+
       // Verificar senha
+      console.log('🔍 Verificando senha...');
       const isPasswordValid = await bcrypt.compare(credentials.password, userData.password);
       
       if (!isPasswordValid) {
+        console.error('❌ Senha inválida');
         return false;
       }
 
+      console.log('✅ Senha válida!');
+
       // Criar sessão
+      console.log('🔍 Criando sessão...');
       const token = generateToken();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24); // 24 horas
@@ -142,17 +163,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { error: sessionError } = await supabase
         .from('sessions')
         .insert({
+          id: crypto.randomUUID(),
           token,
           userId: userData.id,
           expiresAt: expiresAt.toISOString()
         });
 
       if (sessionError) {
+        console.error('❌ Erro ao criar sessão:', sessionError);
         return false;
       }
 
+      console.log('✅ Sessão criada com sucesso!');
+
       // Salvar token no localStorage
       localStorage.setItem('auth_token', token);
+      console.log('✅ Token salvo no localStorage');
 
       // Definir usuário
       const userToSet = {
@@ -166,10 +192,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
       
       setUser(userToSet);
+      console.log('✅ Login realizado com sucesso!');
       
       return true;
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('❌ Erro inesperado no login:', error);
       return false;
     } finally {
       setLoading(false);
@@ -177,31 +204,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const register = async (data: RegisterData): Promise<RegisterResult> => {
+    console.log('📝 Iniciando processo de registro para:', data.email);
     try {
       setLoading(true);
 
       // Verificar se o email já existe
-      const { data: existingUser } = await supabase
+      console.log('🔍 Verificando se email já existe...');
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('id')
         .eq('email', data.email)
         .single();
 
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Erro ao verificar email existente:', checkError);
+        return {
+          success: false,
+          message: 'Erro ao verificar email. Tente novamente.'
+        };
+      }
+
       if (existingUser) {
+        console.error('❌ Email já cadastrado');
         return {
           success: false,
           message: 'Este email já está cadastrado. Tente fazer login ou use outro email.'
         };
       }
 
+      console.log('✅ Email disponível');
+
       // Hash da senha
+      console.log('🔍 Gerando hash da senha...');
       const hashedPassword = await bcrypt.hash(data.password, 10);
+      console.log('✅ Hash da senha gerado');
 
       // Gerar ID único para o usuário
       const userId = crypto.randomUUID();
       const now = new Date().toISOString();
 
       // Criar usuário
+      console.log('🔍 Criando usuário no banco de dados...');
       const { data: newUser, error } = await supabase
         .from('users')
         .insert({
@@ -210,26 +253,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           password: hashedPassword,
           name: data.name,
           role: 'USER',
+          isActive: true,
           createdAt: now,
           updatedAt: now
         })
         .select()
         .single();
 
-      if (error || !newUser) {
-        console.error('Erro ao criar usuário:', error);
+      if (error) {
+        console.error('❌ Erro ao criar usuário:', error);
         return {
           success: false,
           message: 'Erro ao criar usuário. Tente novamente mais tarde.'
         };
       }
 
+      if (!newUser) {
+        console.error('❌ Usuário não foi criado (dados vazios)');
+        return {
+          success: false,
+          message: 'Erro ao criar usuário. Tente novamente mais tarde.'
+        };
+      }
+
+      console.log('✅ Usuário criado com sucesso:', { id: newUser.id, email: newUser.email });
+
       return {
         success: true,
         message: 'Usuário cadastrado com sucesso!'
       };
     } catch (error) {
-      console.error('Erro no registro:', error);
+      console.error('❌ Erro inesperado no registro:', error);
       return {
         success: false,
         message: 'Erro inesperado ao criar conta. Tente novamente.'

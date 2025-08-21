@@ -89,7 +89,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({ isOpen, onClose }) 
         id: Date.now().toString(),
         customer: appointmentForm.customer,
         phone: appointmentForm.phone,
-        customerId: isAuthenticated && user ? user.id : undefined,
+        customerId: undefined, // Deixar undefined para criação automática do cliente
         employeeId: appointmentForm.employeeId,
         date: appointmentForm.date,
         time: appointmentForm.time,

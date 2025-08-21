@@ -101,8 +101,9 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     const customer = customers.find(c => c.name === appointment.customer || c.phone === appointment.phone);
     
     if (customer) {
+      // Atualizar apenas o updatedAt para registrar a atividade
       const updates: any = {
-        lastVisit: appointment.date
+        updatedAt: new Date().toISOString()
       };
       
       updateCustomer(customer.id, updates);
@@ -130,38 +131,56 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const addAppointment = async (appointment: Appointment) => {
     try {
+      console.log('🔍 Iniciando addAppointment:', appointment);
+      
       // Primeiro, verificar se o cliente existe ou criar um novo
       let customerId = appointment.customerId;
+      console.log('📋 CustomerId inicial:', customerId);
       
       if (!customerId) {
+        console.log('🔍 Buscando cliente existente pelo telefone:', appointment.phone);
+        
         // Buscar cliente existente pelo telefone
-        const { data: existingCustomer } = await supabase
+        const { data: existingCustomer, error: searchError } = await supabase
           .from('customers')
           .select('id')
           .eq('phone', appointment.phone)
           .single();
         
+        console.log('📊 Resultado da busca:', { existingCustomer, searchError });
+        
         if (existingCustomer) {
           customerId = existingCustomer.id;
+          console.log('✅ Cliente existente encontrado:', customerId);
         } else {
+          console.log('➕ Criando novo cliente:', { name: appointment.customer, phone: appointment.phone });
+          
           // Criar novo cliente
           const { data: newCustomer, error: customerError } = await supabase
             .from('customers')
             .insert([{
+              id: crypto.randomUUID(),
               name: appointment.customer,
-              phone: appointment.phone
+              phone: appointment.phone,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
             }])
             .select('id')
             .single();
           
+          console.log('📊 Resultado da criação:', { newCustomer, customerError });
+          
           if (customerError) {
-            console.error('Erro ao criar cliente:', customerError);
+            console.error('❌ Erro ao criar cliente:', customerError);
             throw customerError;
           }
           
           customerId = newCustomer.id;
+          console.log('✅ Novo cliente criado:', customerId);
         }
       }
+      
+      console.log('🎯 CustomerId final para agendamento:', customerId);
       
       // Buscar o primeiro serviço para usar como serviceId (compatibilidade com schema)
       const firstServiceId = appointment.services[0] || 'default-service-id';
@@ -177,7 +196,9 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         totalPrice: appointment.price,
         customerId: customerId,
         employeeId: appointment.employeeId,
-        serviceId: firstServiceId
+        serviceId: firstServiceId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       const { data, error } = await supabase

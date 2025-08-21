@@ -487,7 +487,7 @@ const Loyalty: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center font-medium text-purple-600">{customer.points}</td>
                     <td className="px-4 py-3 text-center text-sm text-gray-600">{customer.totalVisits}</td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">{customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString('pt-BR') : '-'}</td>
+                    <td className="px-4 py-3 text-center text-sm text-gray-600">{customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('pt-BR') : '-'}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -564,7 +564,7 @@ const Loyalty: React.FC = () => {
                       <td className="px-4 py-3 text-center text-sm text-gray-600">{customer.totalVisits}</td>
                       <td className="px-4 py-3 text-center text-sm font-medium text-green-600">R$ {customer.totalSpent.toFixed(2)}</td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">
-                        {customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString('pt-BR') : '-'}
+                        {customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('pt-BR') : '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
