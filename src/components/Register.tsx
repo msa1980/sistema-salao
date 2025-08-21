@@ -57,32 +57,42 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
       return;
     }
 
-    const success = await register({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password
-    });
-
-    if (success) {
-      // Adicionar cliente ao banco de dados
-      addCustomer({
+    try {
+      const success = await register({
         name: formData.name,
-        phone: formData.phone,
         email: formData.email,
-        address: formData.address,
-        totalSpent: 0,
-        totalVisits: 0,
-        status: 'active',
-        notes: ''
+        password: formData.password
       });
-      
-      setSuccess('Conta criada com sucesso! Você pode fazer login agora.');
-      setFormData({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-      setTimeout(() => {
-        onSwitchToLogin();
-      }, 2000);
-    } else {
-      setError('Erro ao criar conta. Email pode já estar em uso.');
+
+      if (success) {
+        // Adicionar cliente ao banco de dados
+        try {
+          await addCustomer({
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            address: formData.address,
+            totalSpent: 0,
+            totalVisits: 0,
+            status: 'active',
+            notes: ''
+          });
+          
+          setSuccess('✅ Cadastro realizado com sucesso! Você pode fazer login agora.');
+          setFormData({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+          setTimeout(() => {
+            onSwitchToLogin();
+          }, 3000);
+        } catch (customerError) {
+          console.error('Erro ao adicionar cliente:', customerError);
+          setError('Usuário criado, mas houve erro ao salvar dados do cliente. Tente fazer login.');
+        }
+      } else {
+        setError('Erro ao criar conta. Email pode já estar em uso.');
+      }
+    } catch (error) {
+      console.error('Erro no cadastro:', error);
+      setError('Erro inesperado ao criar conta. Tente novamente.');
     }
   };
 

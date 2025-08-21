@@ -75,13 +75,11 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     loadCustomers();
   }, []);
 
-  const addCustomer = async (customerData: Omit<Customer, 'id' | 'createdAt' | 'totalVisits' | 'totalSpent'>) => {
+  const addCustomer = async (customerData: Omit<Customer, 'id' | 'createdAt'>) => {
     try {
       const newCustomer = {
         ...customerData,
         id: `cust_${Date.now()}`,
-        totalVisits: 0,
-        totalSpent: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
