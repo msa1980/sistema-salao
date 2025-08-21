@@ -35,8 +35,54 @@ const Appointments: React.FC = () => {
   const employees = getActiveEmployees();
   const { customers, getActiveCustomers } = useCustomers();
 
+  // Funções auxiliares para cálculo de datas
+  const getWeekDates = (date: string) => {
+    const currentDate = new Date(date + 'T00:00:00');
+    const dayOfWeek = currentDate.getDay();
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - dayOfWeek);
+    
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      weekDates.push(date.toISOString().split('T')[0]);
+    }
+    return weekDates;
+  };
+
+  const getMonthDates = (date: string) => {
+    const currentDate = new Date(date + 'T00:00:00');
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const monthDates = [];
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const date = new Date(year, month, day);
+      monthDates.push(date.toISOString().split('T')[0]);
+    }
+    return monthDates;
+  };
+
+  const getAppointmentsForPeriod = () => {
+    if (viewMode === 'day') {
+      return getAppointmentsByDate(selectedDate);
+    } else if (viewMode === 'week') {
+      const weekDates = getWeekDates(selectedDate);
+      return appointments.filter(app => weekDates.includes(app.date));
+    } else if (viewMode === 'month') {
+      const monthDates = getMonthDates(selectedDate);
+      return appointments.filter(app => monthDates.includes(app.date));
+    }
+    return [];
+  };
+
   // Filtrar agendamentos pela data selecionada
   const appointmentsByDate = getAppointmentsByDate(selectedDate);
+  const appointmentsForPeriod = getAppointmentsForPeriod();
   const filteredAppointments = appointmentsByDate.filter(app => 
     searchTerm === '' || app.customer.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -482,22 +528,24 @@ const Appointments: React.FC = () => {
         </div>
       </div>
 
-      {/* Agenda do Dia */}
+      {/* Agenda */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h3 className="text-xl font-bold text-gray-900 mb-6">
-          Agenda - {formattedDate}
+          {viewMode === 'day' ? `Agenda - ${formattedDate}` : 
+           viewMode === 'week' ? 'Agenda Semanal' : 'Agenda Mensal'}
         </h3>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Timeline */}
-          <div className="space-y-1">
-            {timeSlots.map((time) => {
-              const appointment = filteredAppointments.find(app => app.time === time);
-              
-              return (
-                <div key={time} className="flex items-center space-x-4 min-h-[60px]">
-                  <div className="w-16 text-sm text-gray-600 font-medium">{time}</div>
-                  <div className="flex-1">
+        {viewMode === 'day' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Timeline */}
+            <div className="space-y-1">
+              {timeSlots.map((time) => {
+                const appointment = filteredAppointments.find(app => app.time === time);
+                
+                return (
+                  <div key={time} className="flex items-center space-x-4 min-h-[60px]">
+                    <div className="w-16 text-sm text-gray-600 font-medium">{time}</div>
+                    <div className="flex-1">
                     {appointment ? (
                       <div className={`p-3 rounded-lg border-2 ${getStatusColor(appointment.status)} hover:shadow-md transition-all cursor-pointer group`}>
                         <div className="flex items-center justify-between">
@@ -558,63 +606,260 @@ const Appointments: React.FC = () => {
                         <span className="text-sm">Horário disponível - Clique para agendar</span>
                       </div>
                     )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Resumo do Dia */}
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg p-4">
+                <h4 className="font-bold text-gray-900 mb-3">Resumo do Dia</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-600">{filteredAppointments.length}</p>
+                    <p className="text-sm text-gray-600">Agendamentos</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600">
+                      R$ {filteredAppointments.reduce((sum, app) => sum + app.price, 0)}
+                    </p>
+                    <p className="text-sm text-gray-600">Faturamento</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
 
-          {/* Resumo do Dia */}
-          <div className="space-y-6">
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3">Próximos Agendamentos</h4>
+                <div className="space-y-3">
+                  {filteredAppointments
+                    .filter(app => app.status !== 'completed' && app.status !== 'cancelled')
+                    .slice(0, 3)
+                    .map((appointment) => (
+                    <div key={appointment.id} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{appointment.customer}</p>
+                          <p className="text-sm text-gray-600">{appointment.service}</p>
+                          <p className="text-xs text-purple-600">
+                            <Briefcase className="w-3 h-3 inline mr-1" />
+                            {employees.find(emp => emp.id === appointment.employeeId)?.name || 'Não atribuído'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-purple-600">{appointment.time}</p>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(appointment.status)}`}>
+                            {getStatusText(appointment.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredAppointments.filter(app => app.status !== 'completed' && app.status !== 'cancelled').length === 0 && (
+                    <p className="text-gray-500 text-center py-4">Nenhum agendamento pendente para este dia</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Visualização Semanal */}
+        {viewMode === 'week' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-7 gap-2">
+              {getWeekDates(selectedDate).map((date, index) => {
+                const dayAppointments = appointments.filter(app => app.date === date && 
+                  (searchTerm === '' || app.customer.toLowerCase().includes(searchTerm.toLowerCase())));
+                const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                const isToday = date === new Date().toISOString().split('T')[0];
+                const isSelected = date === selectedDate;
+                
+                return (
+                  <div key={date} className={`border rounded-lg p-3 min-h-[200px] ${
+                    isToday ? 'border-purple-500 bg-purple-50' : 
+                    isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}>
+                    <div className="text-center mb-2">
+                      <p className="text-xs font-medium text-gray-600">{dayNames[index]}</p>
+                      <p className={`text-sm font-bold ${
+                        isToday ? 'text-purple-600' : 
+                        isSelected ? 'text-blue-600' : 'text-gray-900'
+                      }`}>
+                        {new Date(date + 'T00:00:00').getDate()}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      {dayAppointments.map((appointment) => (
+                        <div key={appointment.id} 
+                             className={`p-2 rounded text-xs cursor-pointer hover:shadow-sm transition-all ${
+                               getStatusColor(appointment.status)
+                             }`}
+                             onClick={() => {
+                               setSelectedDate(date);
+                               setViewMode('day');
+                             }}>
+                          <p className="font-medium truncate">{appointment.customer}</p>
+                          <p className="text-xs opacity-75">{appointment.time}</p>
+                          <p className="text-xs opacity-60 truncate">{appointment.service}</p>
+                        </div>
+                      ))}
+                      {dayAppointments.length === 0 && (
+                        <div 
+                          className="p-2 border border-dashed border-gray-300 rounded text-center text-gray-400 cursor-pointer hover:border-purple-300 hover:text-purple-500 transition-all"
+                          onClick={() => {
+                            setSelectedDate(date);
+                            setEditingAppointment({
+                              time: '09:00', 
+                              date: date,
+                              customer: '',
+                              phone: '',
+                              selectedServices: [],
+                              status: 'scheduled',
+                              employeeId: ''
+                            });
+                            setShowModal(true);
+                          }}
+                        >
+                          <span className="text-xs">+</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Resumo da Semana */}
             <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg p-4">
-              <h4 className="font-bold text-gray-900 mb-3">Resumo do Dia</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <h4 className="font-bold text-gray-900 mb-3">Resumo da Semana</h4>
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-600">{filteredAppointments.length}</p>
+                  <p className="text-2xl font-bold text-purple-600">{appointmentsForPeriod.length}</p>
                   <p className="text-sm text-gray-600">Agendamentos</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-green-600">
-                    R$ {filteredAppointments.reduce((sum, app) => sum + app.price, 0)}
+                    R$ {appointmentsForPeriod.reduce((sum, app) => sum + app.price, 0)}
                   </p>
                   <p className="text-sm text-gray-600">Faturamento</p>
                 </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-gray-900 mb-3">Próximos Agendamentos</h4>
-              <div className="space-y-3">
-                {filteredAppointments
-                  .filter(app => app.status !== 'completed' && app.status !== 'cancelled')
-                  .slice(0, 3)
-                  .map((appointment) => (
-                  <div key={appointment.id} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{appointment.customer}</p>
-                        <p className="text-sm text-gray-600">{appointment.service}</p>
-                        <p className="text-xs text-purple-600">
-                          <Briefcase className="w-3 h-3 inline mr-1" />
-                          {employees.find(emp => emp.id === appointment.employeeId)?.name || 'Não atribuído'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-purple-600">{appointment.time}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(appointment.status)}`}>
-                          {getStatusText(appointment.status)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {filteredAppointments.filter(app => app.status !== 'completed' && app.status !== 'cancelled').length === 0 && (
-                  <p className="text-gray-500 text-center py-4">Nenhum agendamento pendente para este dia</p>
-                )}
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {appointmentsForPeriod.filter(app => app.status === 'completed').length}
+                  </p>
+                  <p className="text-sm text-gray-600">Concluídos</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Visualização Mensal */}
+        {viewMode === 'month' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-7 gap-1">
+              {/* Cabeçalho dos dias da semana */}
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                <div key={day} className="p-2 text-center text-sm font-medium text-gray-600 bg-gray-50">
+                  {day}
+                </div>
+              ))}
+              
+              {/* Dias do mês */}
+              {(() => {
+                const currentDate = new Date(selectedDate + 'T00:00:00');
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - firstDay.getDay());
+                
+                const calendarDays = [];
+                for (let i = 0; i < 42; i++) {
+                  const date = new Date(startDate);
+                  date.setDate(startDate.getDate() + i);
+                  const dateString = date.toISOString().split('T')[0];
+                  const isCurrentMonth = date.getMonth() === month;
+                  const isToday = dateString === new Date().toISOString().split('T')[0];
+                  const isSelected = dateString === selectedDate;
+                  const dayAppointments = appointments.filter(app => app.date === dateString && 
+                    (searchTerm === '' || app.customer.toLowerCase().includes(searchTerm.toLowerCase())));
+                  
+                  calendarDays.push(
+                    <div key={dateString} 
+                         className={`border p-1 min-h-[80px] cursor-pointer hover:bg-gray-50 transition-colors ${
+                           isCurrentMonth ? 'bg-white' : 'bg-gray-50 text-gray-400'
+                         } ${
+                           isToday ? 'border-purple-500 bg-purple-50' : 
+                           isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                         }`}
+                         onClick={() => {
+                           setSelectedDate(dateString);
+                           setViewMode('day');
+                         }}>
+                      <div className={`text-xs font-medium mb-1 ${
+                        isToday ? 'text-purple-600' : 
+                        isSelected ? 'text-blue-600' : 
+                        isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
+                        {date.getDate()}
+                      </div>
+                      <div className="space-y-1">
+                        {dayAppointments.slice(0, 2).map((appointment) => (
+                          <div key={appointment.id} 
+                               className={`p-1 rounded text-xs truncate ${
+                                 getStatusColor(appointment.status)
+                               }`}>
+                            <p className="font-medium truncate">{appointment.customer}</p>
+                            <p className="text-xs opacity-75">{appointment.time}</p>
+                          </div>
+                        ))}
+                        {dayAppointments.length > 2 && (
+                          <div className="text-xs text-gray-500 text-center">
+                            +{dayAppointments.length - 2} mais
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                return calendarDays;
+              })()}
+            </div>
+            
+            {/* Resumo do Mês */}
+            <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg p-4">
+              <h4 className="font-bold text-gray-900 mb-3">Resumo do Mês</h4>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-purple-600">{appointmentsForPeriod.length}</p>
+                  <p className="text-sm text-gray-600">Agendamentos</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    R$ {appointmentsForPeriod.reduce((sum, app) => sum + app.price, 0)}
+                  </p>
+                  <p className="text-sm text-gray-600">Faturamento</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {appointmentsForPeriod.filter(app => app.status === 'completed').length}
+                  </p>
+                  <p className="text-sm text-gray-600">Concluídos</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {appointmentsForPeriod.filter(app => app.status === 'scheduled' || app.status === 'confirmed').length}
+                  </p>
+                  <p className="text-sm text-gray-600">Pendentes</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && <AppointmentModal />}

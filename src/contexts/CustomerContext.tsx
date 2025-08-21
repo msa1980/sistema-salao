@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface Customer {
@@ -55,7 +55,14 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       
-      setCustomers(data || []);
+      // Garantir que totalVisits e totalSpent sejam números válidos
+      const processedData = (data || []).map(customer => ({
+        ...customer,
+        totalVisits: customer.totalVisits || 0,
+        totalSpent: customer.totalSpent || 0
+      }));
+      
+      setCustomers(processedData);
     } catch (error) {
       console.error('Erro inesperado ao carregar clientes:', error);
     } finally {
@@ -73,6 +80,8 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newCustomer = {
         ...customerData,
         id: `cust_${Date.now()}`,
+        totalVisits: 0,
+        totalSpent: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

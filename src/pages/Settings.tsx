@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Employee, Salon } from '../types';
 import { Upload, Save, Camera, Clock, Phone, Mail, MapPin, Users, Plus, Edit, Trash2, X, Briefcase, User, Calendar, Facebook, MessageCircle } from 'lucide-react';
 import { useEmployees } from '../contexts/EmployeeContext';
+import { useSalon } from '../contexts/SalonContext';
 
 const Settings: React.FC = () => {
   // Estado para controlar qual aba está ativa
@@ -10,25 +11,9 @@ const Settings: React.FC = () => {
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   
-  // Usar o contexto de funcionários
+  // Usar o contexto de funcionários e salão
   const { employees, updateEmployee, addEmployee, deleteEmployee } = useEmployees();
-  
-  const [salonData, setSalonData] = useState({
-    name: 'Salão Beleza & Estilo',
-    logo: '',
-    address: 'Rua das Flores, 123 - Centro',
-    phone: '(11) 99999-9999',
-    email: 'contato@salaobelleza.com',
-    workingHours: {
-      start: '08:00',
-      end: '18:00'
-    },
-    socialMedia: {
-      instagram: '@salaobelleza',
-      facebook: 'Salão Belleza',
-      whatsapp: '11999999999'
-    }
-  });
+  const { salonSettings, updateSalonSettings } = useSalon();
 
   const handleSave = () => {
     alert('Configurações salvas com sucesso!');
@@ -39,7 +24,7 @@ const Settings: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setSalonData(prev => ({ ...prev, logo: e.target?.result as string }));
+        updateSalonSettings({ logo: e.target?.result as string });
       };
       reader.readAsDataURL(file);
     }
@@ -78,55 +63,22 @@ const Settings: React.FC = () => {
   const EmployeeModal = () => {
     const [formData, setFormData] = useState({
       name: editingEmployee?.name || '',
-      role: editingEmployee?.role || '',
+      position: editingEmployee?.position || '',
       email: editingEmployee?.email || '',
       phone: editingEmployee?.phone || '',
-      photo: editingEmployee?.photo || '',
-      specialties: editingEmployee?.specialties || [],
+      salary: editingEmployee?.salary || 0,
+      commission: editingEmployee?.commission || 0,
       isActive: editingEmployee?.isActive !== undefined ? editingEmployee.isActive : true,
       hireDate: editingEmployee?.hireDate || new Date().toISOString().split('T')[0],
-      workingHours: editingEmployee?.workingHours || { start: '08:00', end: '18:00' },
     });
-
-    const specialtyOptions = [
-      'Corte Feminino', 'Corte Masculino', 'Escova', 'Coloração', 'Hidratação', 
-      'Manicure', 'Pedicure', 'Maquiagem', 'Design de Sobrancelhas', 'Depilação'
-    ];
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!formData.name || !formData.role || !formData.email || !formData.phone) {
+      if (!formData.name || !formData.position) {
         alert('Por favor, preencha todos os campos obrigatórios.');
         return;
       }
       handleSaveEmployee(formData);
-    };
-
-    const handleSpecialtyToggle = (specialty: string) => {
-      setFormData(prev => {
-        if (prev.specialties.includes(specialty)) {
-          return {
-            ...prev,
-            specialties: prev.specialties.filter(s => s !== specialty)
-          };
-        } else {
-          return {
-            ...prev,
-            specialties: [...prev.specialties, specialty]
-          };
-        }
-      });
-    };
-
-    const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setFormData(prev => ({ ...prev, photo: e.target?.result as string }));
-        };
-        reader.readAsDataURL(file);
-      }
     };
 
     return (
@@ -145,31 +97,6 @@ const Settings: React.FC = () => {
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {formData.photo ? (
-                  <img src={formData.photo} alt="Foto" className="w-full h-full object-cover" />
-                ) : (
-                  <Camera className="w-8 h-8 text-gray-400" />
-                )}
-              </div>
-              <div>
-                <input
-                  type="file"
-                  id="photo-upload"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="photo-upload"
-                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg inline-flex items-center space-x-2 transition-colors"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Enviar Foto</span>
-                </label>
-              </div>
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -193,8 +120,8 @@ const Settings: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.role}
-                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                value={formData.position}
+                onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="Ex: Cabeleireiro, Manicure, etc."
                 required
@@ -204,7 +131,7 @@ const Settings: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Mail className="w-4 h-4 inline mr-1" />
-                Email *
+                Email
               </label>
               <input
                 type="email"
@@ -212,14 +139,13 @@ const Settings: React.FC = () => {
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="email@exemplo.com"
-                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Phone className="w-4 h-4 inline mr-1" />
-                Telefone *
+                Telefone
               </label>
               <input
                 type="tel"
@@ -227,8 +153,36 @@ const Settings: React.FC = () => {
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="(11) 99999-9999"
-                required
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Salário (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.salary}
+                  onChange={(e) => setFormData(prev => ({ ...prev, salary: parseFloat(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Comissão (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.commission}
+                  onChange={(e) => setFormData(prev => ({ ...prev, commission: parseFloat(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
             </div>
 
             <div>
@@ -244,58 +198,8 @@ const Settings: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Clock className="w-4 h-4 inline mr-1" />
-                Horário de Trabalho
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Início</label>
-                  <input
-                    type="time"
-                    value={formData.workingHours.start}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      workingHours: { ...prev.workingHours, start: e.target.value }
-                    }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Fim</label>
-                  <input
-                    type="time"
-                    value={formData.workingHours.end}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      workingHours: { ...prev.workingHours, end: e.target.value }
-                    }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades</label>
-              <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                {specialtyOptions.map(specialty => (
-                  <div key={specialty} className="flex items-center mb-2 last:mb-0">
-                    <input
-                      type="checkbox"
-                      id={`specialty-${specialty}`}
-                      checked={formData.specialties.includes(specialty)}
-                      onChange={() => handleSpecialtyToggle(specialty)}
-                      className="mr-2 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`specialty-${specialty}`} className="flex-1 text-sm">
-                      {specialty}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
+
 
             <div>
               <label className="flex items-center space-x-2">
@@ -377,8 +281,8 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Logo do Salão</label>
               <div className="flex items-center space-x-4">
                 <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                  {salonData.logo ? (
-                    <img src={salonData.logo} alt="Logo" className="w-full h-full object-cover" />
+                  {salonSettings.logo ? (
+                  <img src={salonSettings.logo} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
                     <Camera className="w-8 h-8 text-gray-400" />
                   )}
@@ -406,8 +310,8 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Salão</label>
               <input
                 type="text"
-                value={salonData.name}
-                onChange={(e) => setSalonData(prev => ({ ...prev, name: e.target.value }))}
+                value={salonSettings.name}
+                  onChange={(e) => updateSalonSettings({ name: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
@@ -419,8 +323,8 @@ const Settings: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={salonData.address}
-                onChange={(e) => setSalonData(prev => ({ ...prev, address: e.target.value }))}
+                value={salonSettings.address}
+                  onChange={(e) => updateSalonSettings({ address: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
@@ -433,8 +337,8 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="tel"
-                  value={salonData.phone}
-                  onChange={(e) => setSalonData(prev => ({ ...prev, phone: e.target.value }))}
+                  value={salonSettings.phone}
+                  onChange={(e) => updateSalonSettings({ phone: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -445,8 +349,8 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="email"
-                  value={salonData.email}
-                  onChange={(e) => setSalonData(prev => ({ ...prev, email: e.target.value }))}
+                  value={salonSettings.email}
+                  onChange={(e) => updateSalonSettings({ email: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -464,11 +368,10 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="time"
-                  value={salonData.workingHours.start}
-                  onChange={(e) => setSalonData(prev => ({
-                    ...prev,
-                    workingHours: { ...prev.workingHours, start: e.target.value }
-                  }))}
+                  value={salonSettings.workingHours.start}
+                    onChange={(e) => updateSalonSettings({
+                      workingHours: { ...salonSettings.workingHours, start: e.target.value }
+                    })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -479,11 +382,10 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="time"
-                  value={salonData.workingHours.end}
-                  onChange={(e) => setSalonData(prev => ({
-                    ...prev,
-                    workingHours: { ...prev.workingHours, end: e.target.value }
-                  }))}
+                  value={salonSettings.workingHours.end}
+                    onChange={(e) => updateSalonSettings({
+                      workingHours: { ...salonSettings.workingHours, end: e.target.value }
+                    })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -499,11 +401,10 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value={salonData.socialMedia.instagram}
-                  onChange={(e) => setSalonData(prev => ({
-                    ...prev,
-                    socialMedia: { ...prev.socialMedia, instagram: e.target.value }
-                  }))}
+                  value={salonSettings.socialMedia.instagram}
+                    onChange={(e) => updateSalonSettings({
+                      socialMedia: { ...salonSettings.socialMedia, instagram: e.target.value }
+                    })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="@seuinstagram"
                 />
@@ -515,11 +416,10 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value={salonData.socialMedia.facebook}
-                  onChange={(e) => setSalonData(prev => ({
-                    ...prev,
-                    socialMedia: { ...prev.socialMedia, facebook: e.target.value }
-                  }))}
+                  value={salonSettings.socialMedia.facebook}
+                    onChange={(e) => updateSalonSettings({
+                      socialMedia: { ...salonSettings.socialMedia, facebook: e.target.value }
+                    })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="Seu Facebook"
                 />
@@ -531,11 +431,10 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value={salonData.socialMedia.whatsapp}
-                  onChange={(e) => setSalonData(prev => ({
-                    ...prev,
-                    socialMedia: { ...prev.socialMedia, whatsapp: e.target.value }
-                  }))}
+                  value={salonSettings.socialMedia.whatsapp}
+                    onChange={(e) => updateSalonSettings({
+                      socialMedia: { ...salonSettings.socialMedia, whatsapp: e.target.value }
+                    })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="11999999999"
                 />
@@ -548,37 +447,37 @@ const Settings: React.FC = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-6">Preview do Salão</h3>
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center space-x-4 mb-4">
-                {salonData.logo && (
-                  <img src={salonData.logo} alt="Logo" className="w-16 h-16 rounded-lg object-cover" />
+                {salonSettings.logo && (
+                  <img src={salonSettings.logo} alt="Logo" className="w-16 h-16 rounded-lg object-cover" />
                 )}
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900">{salonData.name}</h4>
+                  <h4 className="text-lg font-bold text-gray-900">{salonSettings.name}</h4>
                   <div className="flex items-center text-gray-600 mt-1">
                     <MapPin className="w-4 h-4 mr-2" />
-                    {salonData.address}
+                    {salonSettings.address}
                   </div>
                 </div>
               </div>
               <div className="flex items-center text-gray-600">
                 <Phone className="w-4 h-4 mr-2" />
-                {salonData.phone}
+                {salonSettings.phone}
               </div>
               <div className="flex items-center text-gray-600">
                 <Mail className="w-4 h-4 mr-2" />
-                {salonData.email}
+                {salonSettings.email}
               </div>
               <div className="flex items-center text-gray-600">
                 <Clock className="w-4 h-4 mr-2" />
-                {salonData.workingHours.start} - {salonData.workingHours.end}
+                {salonSettings.workingHours.start} - {salonSettings.workingHours.end}
               </div>
               <div className="flex items-center space-x-2 mt-4">
-                <a href={`https://instagram.com/${salonData.socialMedia.instagram}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800">
+                <a href={`https://instagram.com/${salonSettings.socialMedia.instagram}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800">
                   <Camera className="w-5 h-5" />
                 </a>
-                <a href={`https://facebook.com/${salonData.socialMedia.facebook}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                <a href={`https://facebook.com/${salonSettings.socialMedia.facebook}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
                   <Facebook className="w-5 h-5" />
                 </a>
-                <a href={`https://wa.me/${salonData.socialMedia.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800">
+                <a href={`https://wa.me/${salonSettings.socialMedia.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800">
                   <MessageCircle className="w-5 h-5" />
                 </a>
               </div>
@@ -620,8 +519,7 @@ const Settings: React.FC = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funcionário</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidades</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horário</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salário/Comissão</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                   </tr>
@@ -632,41 +530,27 @@ const Settings: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden mr-3">
-                            {employee.photo ? (
-                              <img src={employee.photo} alt={employee.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <User className="w-5 h-5 text-gray-400" />
-                            )}
+                            <User className="w-5 h-5 text-gray-400" />
                           </div>
                           <div>
                             <div className="text-sm font-medium text-gray-900">{employee.name}</div>
-                            <div className="text-sm text-gray-500">{employee.role}</div>
+                            <div className="text-sm text-gray-500">{employee.position}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{employee.email}</div>
-                        <div className="text-sm text-gray-500">{employee.phone}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {employee.specialties.slice(0, 2).map((specialty, index) => (
-                            <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              {specialty}
-                            </span>
-                          ))}
-                          {employee.specialties.length > 2 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              +{employee.specialties.length - 2}
-                            </span>
-                          )}
-                        </div>
+                        <div className="text-sm text-gray-900">{employee.email || '-'}</div>
+                        <div className="text-sm text-gray-500">{employee.phone || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 flex items-center">
-                          <Clock className="w-4 h-4 mr-1 text-gray-400" />
-                          {employee.workingHours?.start || '08:00'} - {employee.workingHours?.end || '18:00'}
+                        <div className="text-sm text-gray-900">
+                          R$ {employee.salary?.toLocaleString('pt-BR') || '0,00'}
                         </div>
+                        {employee.commission && (
+                          <div className="text-sm text-gray-500">
+                            Comissão: {employee.commission}%
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

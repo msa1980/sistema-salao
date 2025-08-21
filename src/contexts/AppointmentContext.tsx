@@ -14,6 +14,7 @@ interface Appointment {
   price: number;
   services: string[];
   employeeId: string;
+  customerId?: string;
 }
 
 interface AppointmentContextType {

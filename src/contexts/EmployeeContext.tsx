@@ -1,21 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Employee {
   id: string;
   name: string;
-  role: string;
-  email: string;
-  phone: string;
-  photo: string;
-  specialties: string[];
+  email?: string;
+  phone?: string;
+  position: string;
+  salary?: number;
+  commission?: number;
   isActive: boolean;
   hireDate: string;
-  workingHours: { start: string; end: string };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface EmployeeContextType {
@@ -99,11 +100,10 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const addEmployee = async (employeeData: Omit<Employee, 'id'>) => {
+  const addEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const newEmployee = {
         ...employeeData,
-        id: `emp_${Date.now()}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

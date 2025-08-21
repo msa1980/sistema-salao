@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Bell, Search, User, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Bell, Search, User, X, LogOut } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useSalon } from '../contexts/SalonContext';
 
 interface HeaderProps {
   salonName: string;
@@ -14,7 +16,24 @@ interface Notification {
 }
 
 const Header: React.FC<HeaderProps> = ({ salonName }) => {
+  const { logout } = useAuth();
+  const { salonSettings } = useSalon();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
@@ -146,11 +165,41 @@ const Header: React.FC<HeaderProps> = ({ salonName }) => {
             )}
           </div>
           
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-medium text-gray-900">Admin</span>
+          <div className="relative" ref={userMenuRef}>
+            <button 
+              className="flex items-center space-x-2 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+            >
+              {salonSettings.logo ? (
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <img 
+                    src={salonSettings.logo} 
+                    alt="Logo do Salão" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+              )}
+              <span className="font-medium text-gray-900">Admin</span>
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 overflow-hidden border border-gray-200">
+                <button 
+                  onClick={async () => {
+                    await logout();
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full flex items-center space-x-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors text-red-600 hover:text-red-700"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sair</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

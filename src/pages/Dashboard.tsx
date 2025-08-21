@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
     return customerDate >= weekAgo;
   }).length;
 
-  const lowStockItems = products.filter(product => product.quantity <= product.minStock);
+  const lowStockItems = products.filter(product => product.stock <= product.minStock);
 
   // Dados para gráficos
   const revenueData = [
@@ -102,8 +102,6 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4">
             {todayAppointments.length > 0 ? (
               todayAppointments.map((appointment) => {
-                const customer = customers.find(c => c.id === appointment.customerId);
-                const service = services.find(s => s.id === appointment.serviceId);
                 return (
                   <div key={appointment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center space-x-3">
@@ -112,8 +110,8 @@ const Dashboard: React.FC = () => {
                         appointment.status === 'completed' ? 'bg-blue-500' : 'bg-yellow-500'
                       }`}></div>
                       <div>
-                        <p className="font-medium text-gray-900">{customer?.name || 'Cliente não encontrado'}</p>
-                        <p className="text-sm text-gray-600">{service?.name || 'Serviço não encontrado'}</p>
+                        <p className="font-medium text-gray-900">{appointment.customer}</p>
+                        <p className="text-sm text-gray-600">{appointment.service}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -154,12 +152,12 @@ const Dashboard: React.FC = () => {
                     <Package className="w-5 h-5 text-red-600" />
                     <div>
                       <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">Estoque atual: {item.quantity}</p>
+                      <p className="text-sm text-gray-600">Estoque atual: {item.stock}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-red-600 font-medium">
-                      {item.quantity === 0 ? 'ESGOTADO' : 'BAIXO'}
+                      {item.stock === 0 ? 'ESGOTADO' : 'BAIXO'}
                     </p>
                     <p className="text-xs text-gray-500">Mín: {item.minStock}</p>
                   </div>
